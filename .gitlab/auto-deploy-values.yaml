@@ -1,0 +1,11 @@
+deploymentApiVersion: apps/v1
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 3Gi
+
+  requests:
+    cpu: 100m
+    memory: 512Mi
+

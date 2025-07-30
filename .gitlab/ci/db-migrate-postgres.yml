@@ -1,0 +1,26 @@
+db_migrate:
+  stage: pre-deploy
+  image: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
+  variables:
+    GIT_STRATEGY: none
+    DB_HOST: ${K8S_SECRET_DB_HOST}
+    DB_PASSWORD: ${K8S_SECRET_DB_PASSWORD}
+    DB_USER: ${K8S_SECRET_DB_USER}
+    DB_PORT: ${K8S_SECRET_DB_PORT}
+  before_script:
+    - cd /app
+  script:
+    - python manage.py makemigrations
+    - python manage.py migrate
+    - python manage.py shell -c 
+        "from django.contrib.auth.models import User;
+        from decouple import config; 
+        SUPERUSER = config('SUPERUSER');
+        SUPERUSER_PASS = config('SUPERUSER_PASS');
+        User.objects.filter(username=SUPERUSER).exists() or 
+            User.objects.create_superuser(SUPERUSER, 'admin@example.com', SUPERUSER_PASS)"
+  needs: [ "db_setup:postgres", "build"]
+  rules:
+    - when: always
+  tags:
+    - docker

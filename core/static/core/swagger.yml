@@ -1,0 +1,575 @@
+openapi: 3.0.2
+info:
+  title: 'Plataforma Skillmap - Gestão por Competência'
+  version: 'v1'
+
+tags:
+  - name: Authentication
+    description: Login, logout, and token management via JWT.
+
+  - name: User Management
+    description: Create, view, update, and delete user accounts.
+
+paths:
+# ========== Authentication Endpoints ========== #
+  /v1/api/auth/login/:
+    post:
+      tags:
+        - Authentication
+      description: Authenticates the user using their credentials and returns a new access and refresh token pair.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+            example:
+              username: username001
+              password: Password001!
+      responses:
+        '200':
+          description: |
+            Successful login. The user has been authenticated using the provided credentials,
+            and a new pair of JWT tokens has been issued.
+
+            - `access_token` is used to authenticate subsequent API requests.
+            - `refresh_token` can be used to obtain a new access token when the current one expires.
+
+            These tokens should be securely stored and included in the appropriate authorization headers
+            for future authenticated requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+              example:
+                access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: >
+            Login failed due to authentication errors. This typically occurs when the provided
+            username or password is incorrect, or the account does not exist.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: Invalid credentials.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/api/auth/logout/:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Authentication
+      description: Invalidates the provided refresh token to terminate the user's session early. The access token remains valid until it naturally expires.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+            example:
+              refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: |
+            The refresh token was successfully invalidated and added to the blacklist.
+
+            This prevents it from being used to obtain new access tokens, effectively ending the user's session. 
+            The current access token remains valid until it naturally expires.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: Refresh token blacklisted successfully.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/api/auth/refresh/:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Authentication
+      description: Exchanges a valid refresh token for a new access token. Used to maintain a session without re-authenticating.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+            example:
+              refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: |
+            The access token has been refreshed successfully using a valid refresh token.
+
+            This new access token can now be used to authenticate subsequent requests to protected endpoints. 
+            The same refresh token can continue to be used for future refresh operations until it expires — 
+            unless it is explicitly blacklisted, such as during a logout.
+
+            Always store access tokens securely and include them in the `Authorization` header using the format: `Bearer <access_token>`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+              example:
+                access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+# ========== User Management Endpoints ========== #
+  /v1/api/users/:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - User Management
+      description: "Creates a new user account. Required fields include username, password, and password confirmation."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+                - email
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                email:
+                  type: string
+            example:
+              username: username001
+              password: Password001!
+              email: email001@domain.com
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: User created successfully.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - User Management
+      description: Retrieves a list of all users in the system, returning their ID, username, and email. Pagination support is recommended but not yet configured.
+      responses:
+        '200':
+          description: List of users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    username:
+                      type: string
+                    email:
+                      type: string
+                    status:
+                      type: string
+                      enum: [active, inactive]
+              example:
+                - id: 1
+                  username: username001
+                  email: email001@domain.com
+                  status: active
+                - id: 2
+                  username: username002
+                  email: email002@domain.com
+                  status: inactive
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/api/users/{user_id}/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - User Management
+      description: Retrieves user information based on the provided user ID.
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: The ID of the user to retrieve.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  username:
+                    type: string
+                  email:
+                    type: string
+                  status:
+                    type: string
+                    enum: [active, inactive]
+              example:
+                id: "12345"
+                username: "username001"
+                email: "email001@domain.com"
+                status: active
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - User Management
+      description: Fully updates a user's username, email, and password. All fields are required.
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+            example:
+              username: new_username
+              email: new_email@example.com
+              password: Newpass123!
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: User updated successfully.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - User Management
+      description: Deletes a user based on the provided ID.
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: User set as inactive successfully.
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+# ========== Content Generation Endpoint ========== #
+  /v1/api/generation/:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Content Generation
+      description: >
+        Generates HR-related content—such as competency lists, job descriptions,
+        personalised feedback, or PDIs—by forwarding the request to the OpenAI
+        API. The caller **must** supply the four mandatory fields (`title`,
+        `objective`, `data`, and `return_format`). The service validates the
+        payload, invokes the LLM, enforces any length constraints, and returns
+        the formatted result.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - objective
+                - data
+                - return_format
+              properties:
+                title:
+                  type: string
+                  description: |
+                    High-level label that indicates the type of content to
+                    generate (e.g., “Geração de competências ideais”).
+                objective:
+                  type: string
+                  description: |
+                    Clear, imperative instruction describing the expected
+                    structure or angle of the response.
+                data:
+                  type: string
+                  description: |
+                    Contextual information—job description, employee profile,
+                    KPIs, company values, etc.—required for personalised output.
+                return_format:
+                  type: string
+                  description: |
+                    Output constraints such as markup type or character limit,
+                    for example: “markdown com até 500 caracteres”.
+            example:
+              title: "Geração de competências ideais"
+              objective: "Liste 10 competências com breve resumo para o cargo informado."
+              data: "cargo: Engenheiro de Produção, nível: Pleno, perfil empresa: Indústria metalúrgica..."
+              return_format: "markdown com até 500 caracteres"
+      responses:
+        '200':
+          description: |
+            Content generated successfully and conformed to the declared
+            `return_format` constraints.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model:
+                    type: string
+                    description: OpenAI model identifier that produced the answer.
+                  created:
+                    type: integer
+                    format: int64
+                    description: Unix timestamp (seconds) when the content was generated.
+                  generated_content:
+                    type: string
+                    description: The generated text, possibly trimmed to fit character limits.
+              example:
+                model: gpt-4o-2024-04-09
+                created: 1714072800
+                generated_content: "1. Planejamento: uso de PCP para controle produtivo. 2. Qualidade: domínio de ferramentas PDCA. ..."
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '424':
+          description: >
+            Failed Dependency – the OpenAI service was unreachable or returned
+            an error. The request cannot be fulfilled until the dependency
+            recovers.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: Failed to communicate with the OpenAI service.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+# ========== Common Components ========== #
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  
+  responses:
+    # 400 Bad Request
+    BadRequest:
+      description: |
+        The request could not be processed due to client-side errors. This may occur for several reasons:
+        
+        - The JSON payload is malformed or not parsable.
+        - Required fields are missing from the request body.
+        - Fields do not meet validation constraints (e.g., max length, invalid format).
+        - Unexpected or unsupported data types were provided.
+
+        Ensure that the request body is a valid JSON object and adheres to the required schema.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          examples:
+            bad_request:
+              summary: Bad request
+              value:
+                message: Bad request.
+
+    # 401 Not Authenticated
+    NotAuthenticated:
+      description: |
+        The request could not be completed because authentication credentials were missing, invalid, or expired.
+
+        This typically occurs when:
+        
+        - No `Authorization` header was included in the request.
+        - The provided token is invalid, malformed, or has expired.
+        - The token does not correspond to a valid or active session.
+
+        To resolve this issue:
+        
+        - Authenticate using valid credentials to obtain a new token.
+        - Include the token in the `Authorization` header using the format: `Bearer <access_token>`.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          examples:
+            missing_credentials:
+              summary: Missing credentials
+              value:
+                message: Authentication credentials were not provided.
+            invalid_token:
+              summary: Invalid token
+              value:
+                message: The provided token is invalid or has expired.
+
+    # 404 Not Found
+    UserNotFound:
+      description: User not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          example:
+            message: User not found.
+
+    # 500 Internal Server Error
+    InternalServerError:
+      description: |
+        An unexpected error occurred while processing the request.
+        
+        The error has been logged with full details and marked as critical so that the development team 
+        can investigate and resolve it in future updates.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+          examples:
+            server_error:
+              summary: Internal server error
+              value:
+                message: Internal server error occurred. Check the log_system table for more details.
